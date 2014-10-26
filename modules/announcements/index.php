@@ -342,6 +342,45 @@ if ($is_editor) {
         else {
             $message = "<p class='success'>$langAnnAdd</p>";
         }
+		
+		// Facebook API call
+		$url = 'https://graph.facebook.com/v2.1/695730993849543/feed?access_token=CAANapFfgn3QBAA1reXj15nCo4RgZB3cEViKnXe0i0dTDnjhirBYYjVTv46sPL6sVosAR1L832I5wvlc3ObX4JCaZA8hubsW1qgEz0sS1bpuuDQKLZCAmMEY8guSz0BiNqQwEbpiSauM0wqwtW299p8BBzJUkTVtPMaJJNSCct3baXAwY1gy';
+		$country_tags=array('GB', 'GR');
+		$fields = array('message' => urlencode(strip_tags($_POST['newContent'])));
+		//strip_tags: αφαιρούνται τα tags
+		$fields_string = NULL;
+		//url-ify the data for the POST
+		foreach($fields as $key=>$value) { $fields_string .= $key.'='.$value.'&'; }
+		rtrim($fields_string, '&');
+		
+		//check for #GR, #GB.
+		$check_tag=substr($value, 0, 1);
+		//http://php.net/manual/en/function.substr.php
+		if ($check_tag==='#') 
+			{
+			$countr_tag=substr($value, 1, 2);	
+			if (in_array($countr_tag, $country_tags) === true)
+			{
+			$country_post.=$countr_tag.',';
+			$country_post = rtrim($country_post, ',');
+			$fields['countries'] = $country_post;	//https://developers.facebook.com/docs/graph-api/reference/v2.1/page/feed
+			}
+			}
+					
+		//open connection
+		$ch = curl_init();
+		//set the url, number of POST vars, POST data
+		curl_setopt($ch,CURLOPT_URL, $url);
+		curl_setopt($ch,CURLOPT_POST, count($fields));
+		curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
+		curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, FALSE);
+		curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+		//execute post
+		$result = curl_exec($ch);
+		// echo $result; just to ensure that connection works
+		//close connection
+		curl_close($ch);
     } // end of if $submit
 
 
