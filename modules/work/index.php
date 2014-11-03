@@ -326,10 +326,8 @@ function add_assignment() {
     $max_grade = filter_input(INPUT_POST, 'max_grade', FILTER_VALIDATE_FLOAT);
     $assign_to_specific = filter_input(INPUT_POST, 'assign_to_specific', FILTER_VALIDATE_INT);
     $assigned_to = filter_input(INPUT_POST, 'ingroup', FILTER_VALIDATE_INT, FILTER_REQUIRE_ARRAY);
-	//ΕΛΛΑΚ
-	$auto_judge = filter_input(INPUT_POST, 'auto_judge', FILTER_VALIDATE_INT); //Τέλος ΕΛΛΑΚ
     $secret = uniqid('');
-	
+	$auto_judge = filter_input(INPUT_POST, 'auto_judge', FILTER_VALIDATE_INT);
 
     if ($assign_to_specific == 1 && empty($assigned_to)) {
         $assign_to_specific = 0;
@@ -527,33 +525,50 @@ function submit_work($id, $on_behalf_of = null) {
             $tool_content .= "<p class='caution'>$langUploadError<br /><a href='$_SERVER[SCRIPT_NAME]?course=$course_code'>$langBack</a></p><br />";
         }
 		
-		//adding extra code ELLAK
-		if($auto_judge) {
-			// Auto-judge: Send file to hackearth
-			global $hackerEarthKey;
-			$content = file_get_contents("$workPath/$filename");
-			//set POST variables
-			$url = 'http://api.hackerearth.com/code/run/';
-			$fields = array('client_secret' => $hackerEarthKey, 'source' => $content, 'lang' => 'PYTHON');
-			//url-ify the data for the POST
-			foreach($fields as $key=>$value) { $fields_string .= $key.'='.$value.'&'; }
-			rtrim($fields_string, '&');
-			//open connection
-			$ch = curl_init();
-			//set the url, number of POST vars, POST data
-			curl_setopt($ch,CURLOPT_URL, $url);
-			curl_setopt($ch,CURLOPT_POST, count($fields));
-			curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
-			curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);
-			//execute post
-			$result = curl_exec($ch);
-			$result = json_decode($result, true);
-			$result['run_status']['output'] = trim($result['run_status']['output']);
-			// Add the output as a comment
-			submit_grade_comments($id, $sid, 10, 'Output: '.$result['run_status']['output'], false);
-			// End Auto-judge
+		//ΕΛΛΑΚ 528
+		if($auto_judge){
+		// Auto-judge: Send file to hackearth
+		global $hackerEarthKey;
+		$content = file_get_contents("$workPath/$filename");
+		//εύρεση της επέκτασης του υποβαλλόμενου αρχείου
+		$dot=strrpos($file_name, '.');
+		$extension=substr($file_name, $dot+1);
+		$valid_extensions=array("c", "cpp", "chh", "clj", "cs", "java", "js", "hs", "pl", "php", "py", "rb");	//αποδεκτές επεκτάσεις
+		$check_extension=in_array($extension, $valid_extensions);	//έλεγχος αν η επέκταση είναι μεταξύ των αποδεκτών
+		if ($check_extension==TRUE)
+		{
+		$pos_extension=array_search($extension, $valid_extensions);	//αν η επέκταση είναι αποδεκτή, εντόπισε τη θέση της στον πίνακα επεκτάσεων
 		}
-		// end of ELLAK code
+		$valid_langs=array("C", "CPP", "CPP11", "CLOJURE", "CSHARP", "JAVA", "JAVASCRIPT", "HASKELL", "PERL", "PHP", "PYTHON", "RUBY");	//αντίστοιχα ορίσματα για τη lang
+		
+		//set POST variables
+		$fields_string = null;
+		$url = 'http://api.hackerearth.com/code/run/';
+		$fields = array('client_secret' => $hackerEarthKey, 'source' => $content, 'lang' => $valid_langs[$pos_extension]);
+		//url-ify the data for the POST
+		foreach($fields as $key=>$value) { $fields_string .= $key.'='.$value.'&'; }
+		rtrim($fields_string, '&');
+		//open connection
+		$ch = curl_init();
+		//set the url, number of POST vars, POST data
+		curl_setopt($ch,CURLOPT_URL, $url);
+		curl_setopt($ch,CURLOPT_POST, count($fields));
+		curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
+		curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);
+		//execute post
+		$result = curl_exec($ch);
+		$result = json_decode($result, true);
+		$result['run_status']['output'] = trim($result['run_status']['output']);
+		// Add the output as a comment
+		if ($check_extension==FALSE){	//αν η επέκταση δεν είναι αποδεκτή, να εμφανίζεται μήνυμα λάθους στο σχόλιο
+		submit_grade_comments($id, $sid, 0, 'Μη υποστηριζόμενος τύπος αρχείου.'.$result['run_status'][' '], false); 	//μήνυμα λάθους & βαθμός=0
+		}
+		else {
+		submit_grade_comments($id, $sid, 10, 'Output: '.$result['run_status']['output'], false);
+		}
+		// End Auto-judge
+		}
+		//ΕΛΛΑΚ .- 554
 		
     } else { // not submit_ok
         $tool_content .="<p class='caution'>$langExerciseNotPermit<br /><a href='$_SERVER[SCRIPT_NAME]?course=$course_code'>$langBack</a></p></br>";
@@ -608,19 +623,39 @@ function new_assignment() {
           <td><input type='radio' id='user_button' name='group_submissions' value='0' checked='1' /><label for='user_button'>$m[user_work]</label>
           <br /><input type='radio' id='group_button' name='group_submissions' value='1' /><label for='group_button'>$m[group_work]</label></td>
         </tr>
+		
         <tr>
-          <th>$m[WorkAssignTo]:</th>
+		  <th>$m[WorkAssignTo]:</th>
           <td><input type='radio' id='assign_button_all' name='assign_to_specific' value='0' checked='1' /><label for='assign_button_all'>Όλους</label>
           <br /><input type='radio' id='assign_button_some' name='assign_to_specific' value='1' /><label for='assign_button_some'>$m[WorkToUser]</label></td>
-        </tr> 
+        </tr>   
 
-		//ELLAK προσθήκη
 		<tr>
           <th>Auto-judge:</th>
           <td><input type='checkbox' id='auto_judge' name='auto_judge' value='1' checked='1' /></td>
 		</tr>
-		//τέλος ΕΛΛΑΚ
-		
+		<tr>
+			<th>Επιτρεπόμενες γλώσσες:</th>
+		</tr>
+		<tr>
+          <td>
+		  <select name='valid_exte[]' size=12 multiple>		
+			<option value='c'>C</option>
+			<option value='cpp'>C++</option>
+			<option value='chh'>C++11</option>
+			<option value='clj'>Clojure</option>
+			<option value='cs'>C#</option>
+			<option value='java'>Java</option>
+			<option value='js'>JavaScript</option>
+			<option value='hs'>Haskel</option>
+			<option value='pl'>Perl</option>
+			<option value='php'>PHP</option>
+			<option value='py' selected='selected'><strong>Python</strong></option>
+			<option value='rb'>Ruby</option>
+			</select> 
+		  </td>
+		</tr>		  
+				
         <tr id='assignees_tbl' style='display:none;'>
           <th class='left' valign='top'></th>
           <td>
