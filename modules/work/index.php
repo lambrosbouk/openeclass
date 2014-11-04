@@ -364,7 +364,7 @@ function add_assignment() {
         $assign_to_specific = 0;
     }
     if (@mkdir("$workPath/$secret", 0777) && @mkdir("$workPath/admin_files/$secret", 0777, true)) {       
-        $id = Database::get()->query("INSERT INTO assignment (course_id, title, description, deadline, late_submission, comments, submission_date, secret_directory, group_submissions, max_grade, assign_to_specific, auto_judge) "
+        $id = Database::get()->query("INSERT INTO assignment (course_id, title, description, deadline, late_submission, comments, submission_date, secret_directory, group_submissions, max_grade, assign_to_specific, auto_judge, auto_judge_scenarios) "
                 . "VALUES (?d, ?s, ?s, ?t, ?d, ?s, ?t, ?s, ?d, ?d, ?d, ?d, ?s)", $course_id, $title, $desc, $deadline, $late_submission, '', date("Y-m-d H:i:s"), $secret, $group_submissions, $max_grade, $assign_to_specific, $auto_judge, $auto_judge_scenarios)->lastInsertID;
         $secret = work_secret($id);
         if ($id) {
@@ -687,7 +687,7 @@ function new_assignment() {
 					<tr>
 						<td><input type='text' name='auto_judge_scenarios'[0][input]/></td>
 						<td><input type='text' name='auto_judge_scenarios'[0][output]/></td>
-						<td><a href='#' class='autojudge_remove_scenario' style='display: none'>X</a></td>
+						<td><a href='#' class='autojudge_remove_scenario' style='display: none;'>X</a></td>
 					</tr>
 					<tr>
 						<td></td>
@@ -696,7 +696,6 @@ function new_assignment() {
 					</tr>
 				</tbody>
 			</table>	
-			
 		  </td>
 		</tr>
 		<tr>
