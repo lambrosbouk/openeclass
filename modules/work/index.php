@@ -105,6 +105,7 @@ if ($is_editor) {
         $('input[name=group_submissions]').click(changeAssignLabel);
         $('input[id=assign_button_some]').click(ajaxAssignees);        
         $('input[id=assign_button_all]').click(hideAssignees);
+		$('input[name=auto_judge]').click(changeAutojudgeScenariosVisibility);
         function hideAssignees()
         {
             $('#assignees_tbl').hide();
@@ -149,6 +150,35 @@ if ($is_editor) {
                 $('#assign_box').find('option').remove().end().append(select_content);
             });
         }
+		function changeAutojudgeScenariosVisibility() {
+			if ($(this).is(':checked')) {
+				$(this).parent().find('table').show();}
+			else {
+				$(this).parent().find('table').hide();}
+		}
+		//add row
+		$('#autojudge_new_scenario').click.function(e) {
+		var rows=$(this).parent().parent().parent().find('tr').size()-1;
+		//clone the first line
+		var newLine=$(this).parent().parent().parent().find('tr:first').clone();
+		//replace 0 with the line number
+		newLine.html(newLine.html().replace(/auto_judge_scenarios\[0\]/g, 'auto_judge'scenarios['+rows+']'));
+		//initialize the remove event and show the button
+		newLine.find('.autojudge_remove_scenario').show();
+		newLine.find('.autojudge_remove_scenario').click(removeRow);
+		//insert it just before the final line
+		newLine.insertBefore($(this).parent().parent().parent().find('tr:last'));
+		e.preventDefault();
+		return false;
+		});
+		//remove row
+		function removeRow(e){
+			$(this).parent().parent().remove();
+			e.preventDefault();
+			return false;
+		}
+		$('.autojudge_remove_scenario').click(removeRow);
+		
     });
     
     </script>";    
@@ -327,13 +357,15 @@ function add_assignment() {
     $assign_to_specific = filter_input(INPUT_POST, 'assign_to_specific', FILTER_VALIDATE_INT);
     $assigned_to = filter_input(INPUT_POST, 'ingroup', FILTER_VALIDATE_INT, FILTER_REQUIRE_ARRAY);
     $secret = uniqid('');
+	$auto_judge = filter_input(INPUT_POST, 'auto_judge', FILTER_VALIDATE_INT);
+	$auto_judge_scenarios=serialize($_POST['auto_judge_scenarios']);
 
     if ($assign_to_specific == 1 && empty($assigned_to)) {
         $assign_to_specific = 0;
     }
     if (@mkdir("$workPath/$secret", 0777) && @mkdir("$workPath/admin_files/$secret", 0777, true)) {       
-        $id = Database::get()->query("INSERT INTO assignment (course_id, title, description, deadline, late_submission, comments, submission_date, secret_directory, group_submissions, max_grade, assign_to_specific) "
-                . "VALUES (?d, ?s, ?s, ?t, ?d, ?s, ?t, ?s, ?d, ?d, ?d)", $course_id, $title, $desc, $deadline, $late_submission, '', date("Y-m-d H:i:s"), $secret, $group_submissions, $max_grade, $assign_to_specific)->lastInsertID;
+        $id = Database::get()->query("INSERT INTO assignment (course_id, title, description, deadline, late_submission, comments, submission_date, secret_directory, group_submissions, max_grade, assign_to_specific, auto_judge) "
+                . "VALUES (?d, ?s, ?s, ?t, ?d, ?s, ?t, ?s, ?d, ?d, ?d, ?d, ?s)", $course_id, $title, $desc, $deadline, $late_submission, '', date("Y-m-d H:i:s"), $secret, $group_submissions, $max_grade, $assign_to_specific, $auto_judge, $auto_judge_scenarios)->lastInsertID;
         $secret = work_secret($id);
         if ($id) {
             $local_name = uid_to_name($uid);
@@ -421,9 +453,11 @@ function submit_work($id, $on_behalf_of = null) {
         }
     } //checks for submission validity end here
     
-    $row = Database::get()->querySingle("SELECT title, group_submissions FROM assignment WHERE course_id = ?d AND id = ?d", $course_id, $id);
+    $row = Database::get()->querySingle("SELECT title, group_submissions, auto_judge, auto_judge_scenarios FROM assignment WHERE course_id = ?d AND id = ?d", $course_id, $id);
     $title = q($row->title);
     $group_sub = $row->group_submissions;
+	$auto_judge = $row->auto_judge;
+	$auto_judge_scenarios=$auto_judge == true ? unserialize($row->auto_judge_scenarios):null;
     $nav[] = $works_url;
     $nav[] = array('url' => "$_SERVER[SCRIPT_NAME]?id=$id", 'name' => $title);
 
@@ -522,6 +556,62 @@ function submit_work($id, $on_behalf_of = null) {
         } else {
             $tool_content .= "<p class='caution'>$langUploadError<br /><a href='$_SERVER[SCRIPT_NAME]?course=$course_code'>$langBack</a></p><br />";
         }
+			
+		//ΕΛΛΑΚ 528
+		if($auto_judge){
+		// Auto-judge: Send file to hackearth and calculate grade
+		global $hackerEarthKey;
+		$content = file_get_contents("$workPath/$filename");
+		
+		//εύρεση της επέκτασης του υποβαλλόμενου αρχείου
+		$dot=strrpos($file_name, '.');
+		$extension=substr($file_name, $dot+1);
+		$valid_extensions=array("c", "cpp", "chh", "clj", "cs", "java", "js", "hs", "pl", "php", "py", "rb");	//αποδεκτές επεκτάσεις
+		$check_extension=in_array($extension, $valid_extensions);	//έλεγχος αν η επέκταση είναι μεταξύ των αποδεκτών
+		if ($check_extension==TRUE)
+		{
+		$pos_extension=array_search($extension, $valid_extensions);	//αν η επέκταση είναι αποδεκτή, εντόπισε τη θέση της στον πίνακα επεκτάσεων
+		}
+		$valid_langs=array("C", "CPP", "CPP11", "CLOJURE", "CSHARP", "JAVA", "JAVASCRIPT", "HASKELL", "PERL", "PHP", "PYTHON", "RUBY");	//αντίστοιχα ορίσματα για τη lang
+		
+		//run each scenario and count how many passed
+		$passed=0;
+		foreach($auto_judge_scenarios as $curScenario) {
+		
+		//set POST variables
+		$fields_string = null;
+		$url = 'http://api.hackerearth.com/code/run/';
+		$fields = array('client_secret' => $hackerEarthKey, 'input' => $curScenario['input'], 'source' => $content, 'lang' => $valid_langs[$pos_extension]);
+		//url-ify the data for the POST
+		foreach($fields as $key=>$value) { $fields_string .= $key.'='.$value.'&'; {
+			rtrim($fields_string, '&');
+			//open connection
+			$ch = curl_init();
+			//set the url, number of POST vars, POST data
+			curl_setopt($ch,CURLOPT_URL, $url);
+			curl_setopt($ch,CURLOPT_POST, count($fields));
+			curl_setopt($ch,CURLOPT_POSTFIELDS, $fields_string);
+			curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);
+			//execute post
+			$result = curl_exec($ch);
+			$result = json_decode($result, true);
+			$result['run_status']['output'] = trim($result['run_status']['output']);
+			if ($result['run_status']['output'] == $curScenario['output']) {$passed++;}	//increment the counter if passed
+		}
+		$grade=round($passed/count($auto_judge_scenarios)*10);
+		}
+		}
+		// Add the output as a comment
+		if ($check_extension==FALSE){	//αν η επέκταση δεν είναι αποδεκτή, να εμφανίζεται μήνυμα λάθους στο σχόλιο
+		submit_grade_comments($id, $sid, $grade, 'Μη υποστηριζόμενος τύπος αρχείου.'.$result['run_status'][' '], false); 	//μήνυμα λάθους & βαθμός=0
+		}
+		else {
+		submit_grade_comments($id, $sid, $grade, 'Tests passed: '.$passed.'/'.count($auto_judge_scenarios), $result['run_status']['output'], false);
+		}		
+		// End Auto-judge
+		}
+		//ΕΛΛΑΚ .- 554
+		
     } else { // not submit_ok
         $tool_content .="<p class='caution'>$langExerciseNotPermit<br /><a href='$_SERVER[SCRIPT_NAME]?course=$course_code'>$langBack</a></p></br>";
     }
@@ -575,11 +665,62 @@ function new_assignment() {
           <td><input type='radio' id='user_button' name='group_submissions' value='0' checked='1' /><label for='user_button'>$m[user_work]</label>
           <br /><input type='radio' id='group_button' name='group_submissions' value='1' /><label for='group_button'>$m[group_work]</label></td>
         </tr>
+		
         <tr>
-          <th>$m[WorkAssignTo]:</th>
+		  <th>$m[WorkAssignTo]:</th>
           <td><input type='radio' id='assign_button_all' name='assign_to_specific' value='0' checked='1' /><label for='assign_button_all'>Όλους</label>
           <br /><input type='radio' id='assign_button_some' name='assign_to_specific' value='1' /><label for='assign_button_some'>$m[WorkToUser]</label></td>
-        </tr>        
+        </tr>   
+
+		<tr>
+          <th>Auto-judge:</th>
+          <td><input type='checkbox' id='auto_judge' name='auto_judge' value='1' checked='1' />
+			<table>
+				<thread>
+					<tr>
+						<th>Input</th>
+						<th>Expected Output</th>
+						<th>Delete</th>	
+					</tr>
+				</thread>
+				<tbody>
+					<tr>
+						<td><input type='text' name='auto_judge_scenarios'[0][input]/></td>
+						<td><input type='text' name='auto_judge_scenarios'[0][output]/></td>
+						<td><a href='#' class='autojudge_remove_scenario' style='display: none'>X</a></td>
+					</tr>
+					<tr>
+						<td></td>
+						<td></td>
+						<td><input type='submit' value='Νέο σενάριο' id=autojudge_new_scenario</td>
+					</tr>
+				</tbody>
+			</table>	
+			
+		  </td>
+		</tr>
+		<tr>
+			<th>Επιτρεπόμενες γλώσσες:</th>
+		</tr>
+		<tr>
+          <td>
+		  <select name='valid_exte[]' size=12 multiple>		
+			<option value='c'>C</option>
+			<option value='cpp'>C++</option>
+			<option value='chh'>C++11</option>
+			<option value='clj'>Clojure</option>
+			<option value='cs'>C#</option>
+			<option value='java'>Java</option>
+			<option value='js'>JavaScript</option>
+			<option value='hs'>Haskel</option>
+			<option value='pl'>Perl</option>
+			<option value='php'>PHP</option>
+			<option value='py' selected='selected'><strong>Python</strong></option>
+			<option value='rb'>Ruby</option>
+			</select> 
+		  </td>
+		</tr>		  
+				
         <tr id='assignees_tbl' style='display:none;'>
           <th class='left' valign='top'></th>
           <td>
