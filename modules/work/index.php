@@ -24,7 +24,7 @@
   ============================================================================
  */
 
-$require_current_course = true;	/*123*/
+$require_current_course = true;	/*12345*/
 $require_login = true;
 $require_help = true;
 $helpTopic = 'Work';
