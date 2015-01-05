@@ -657,7 +657,7 @@ function submit_work($id, $on_behalf_of = null) {
 								
                 $content = file_get_contents("$workPath/$filename");
                 // Run each scenario and count how many passed
-                 $auto_judge_scenarios_output = array(
+                $auto_judge_scenarios_output = array(
                     array(
                         'student_output'=> '',
                         'passed'=> 0,
@@ -667,7 +667,6 @@ function submit_work($id, $on_behalf_of = null) {
                 $passed = 0;
                 $i = 0;
                 $partial = 0;
-                $errorsComment = '';
                 $weight_sum = 0;
                 foreach($auto_judge_scenarios as $curScenario) {
                     //set POST variables
@@ -682,9 +681,6 @@ function submit_work($id, $on_behalf_of = null) {
                         'source'        => urlencode($content),
                         'lang'          => $lang,									
                     );
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 					}
 				else {	
 					$url = 'http://codepad.org/';
@@ -701,31 +697,13 @@ function submit_work($id, $on_behalf_of = null) {
 							
                     //url-ify the data for the POST
                     foreach($fields as $key=>$value) {
-=======
-
-                    // url-ify the data for the POST
-                    foreach ($fields as $key => $value) {
->>>>>>> 8d331bdf9b828118fda67aad959aeee0578cdbf3
-=======
-
-                    // url-ify the data for the POST
-                    foreach ($fields as $key => $value) {
->>>>>>> 8d331bdf9b828118fda67aad959aeee0578cdbf3
-=======
-
-                    // url-ify the data for the POST
-                    foreach ($fields as $key => $value) {
->>>>>>> 8d331bdf9b828118fda67aad959aeee0578cdbf3
                         $fields_string .= $key.'='.$value.'&';
                     }
-                    // Remove last '&' character;
+
                     rtrim($fields_string, '&');
 
-                    // Open curl connection
+                    //open connection
                     $ch = curl_init();
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 					
                     //set the url, number of POST vars, POST data
                     curl_setopt($ch,CURLOPT_URL, $url);
