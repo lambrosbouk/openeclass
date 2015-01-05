@@ -724,16 +724,17 @@ function submit_work($id, $on_behalf_of = null) {
 			    else {
 				    
 					
-					//$url_result = curl_exec($ch); 
+					$url_result = curl_exec($ch); 
 					//$html = file_get_html($url_result);
 
-                    $html = file_get_html('http://codepad.org/xFT5jvFu');
-					$html = str_get_html($html);
+                    //$html = file_get_html('http://codepad.org/xFT5jvFu');
+                    //$html = file_get_html('$url_result');
+					$html = str_get_html($url_result);
 					
 					
 					$ret = $html->find('div', 6);
                     		
-                   echo $ret;
+                   //echo $ret;
 												
 				}
 			}
