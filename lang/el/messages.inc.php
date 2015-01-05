@@ -4267,3 +4267,10 @@ $langFormErrors = 'Η φόρμα περιέχει λάθη. Παρακαλώ δ�
  * ************************************************************ */
 $langMoreOptions = 'Περισσότερες επιλογές';
 $langLessOptions = 'Λιγότερες επιλογές';
+
+//auto_judge.php
+$langauto_judge = 'Ρυθμίσεις Αυτόματου Κριτή';
+$langHackerEarth = "Κλειδί HackerEarth";
+$langCodePad = 'Επιλέξατε Codepad.org';
+$langAutoJudge = "Ρυθμίσεις αυτόματου κριτή του $siteName";
+$langHackerEarthKeyUpdated = "Το κλειδί του HackerEarth τροποποιήθηκε με επιτυχία!";
